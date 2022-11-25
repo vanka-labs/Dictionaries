@@ -41,4 +41,4 @@ create table университеты
 
 INSERT INTO университеты (id, city_id, дата_основания, название, количество_студентов, deleted) VALUES (1, 1, '1921-10-31', 'BSU', 44.877, 0)
 INSERT INTO города (id, год_основания, город, количество_жителей, страна, deleted) VALUES (1, 1066, 'Минск', 'Беларусь', 1.996556, 0)
-
+insert into fks_table (fk_id, parent_table, child_table, child_key_name, parent_key_name, additional_info) values (1,города,университеты,city_id,город,страна);
