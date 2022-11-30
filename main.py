@@ -1,11 +1,12 @@
-from decimal import *
 import sqlite3
 from datetime import date
+from decimal import *
 from functools import partial
 from tkinter import *
 from tkinter import messagebox
 from tkinter.messagebox import showerror
 from tkinter.ttk import Combobox
+
 from tkcalendar import DateEntry
 
 
@@ -152,11 +153,12 @@ def choose_dict(combo, sorted_res=0, columns=0):
                     if j != index_unchangeable_col1 and j != index_unchangeable_col2 and j != date_index:
                         e = Entry(resWindow2, relief=GROOVE)
                         e.grid(row=i, column=j, sticky=NSEW)
-                        if 'decimal' in table_info[table_info.index(columns[j])+1]:
-                            decimal_col = table_info[table_info.index(columns[j])+1].split('(')[1]
-                            int_len, float_len = len(str(int(res[i - 1][j] // 1))), int(decimal_col.split(', ')[1][0:-1])
+                        if 'decimal' in table_info[table_info.index(columns[j]) + 1]:
+                            decimal_col = table_info[table_info.index(columns[j]) + 1].split('(')[1]
+                            int_len, float_len = len(str(int(res[i - 1][j] // 1))), int(
+                                decimal_col.split(', ')[1][0:-1])
                             getcontext().prec = float_len + int_len
-                            decimal_res = Decimal(str(res[i-1][j])) + Decimal('0.0')
+                            decimal_res = Decimal(str(res[i - 1][j])) + Decimal('0.0')
                             e.insert(END, decimal_res.normalize())
                             entries.append(e)
                             getcontext().prec = 27
@@ -197,7 +199,8 @@ def choose_dict(combo, sorted_res=0, columns=0):
                         delete_btn.grid(column=j + 2, row=i)
         insert_btn = Button(resWindow2, text='Добавить запись', anchor='center', command=partial(insert, chosen_dict,
                                                                                                  columns, combo,
-                                                                                                 resWindow2, table_info))
+                                                                                                 resWindow2,
+                                                                                                 table_info))
         insert_btn.grid(column=len(res[0]) // 2, row=i + 1)
 
     elif chosen_dict in get_tables()[1]:
@@ -205,7 +208,8 @@ def choose_dict(combo, sorted_res=0, columns=0):
         result.grid()
         insert_btn = Button(resWindow2, text='Добавить запись', anchor='center', command=partial(insert, chosen_dict,
                                                                                                  columns, combo,
-                                                                                                 resWindow2, table_info))
+                                                                                                 resWindow2,
+                                                                                                 table_info))
         insert_btn.grid()
     else:
         result = Label(resWindow2, text='Справочник с таким именем не найден', width=50, anchor="center")
@@ -295,15 +299,16 @@ def edit(row, entries, columns, table, window, combo, table_info):
 
         for e in edits:
             try:
-               query = "update " + table + " set "
-               query += e[0] + "=? where id=?;"
-               cursor.execute(query, (e[1], id))
-               conn.commit()
+                query = "update " + table + " set "
+                query += e[0] + "=? where id=?;"
+                cursor.execute(query, (e[1], id))
+                conn.commit()
             except:
-                sqlite3.IntegrityError
+                messagebox.showerror('Ошибка', 'Данные введены некорректно!')
         cursor.close()
         conn.close()
     window.destroy()
+    combo.set(table.upper())
     choose_dict(combo)
 
 
@@ -317,6 +322,7 @@ def delete(row, columns, table, window, combo):
         cursor.execute(query, (id,))
         conn.commit()
         window.destroy()
+        combo.set(table.upper())
         choose_dict(combo)
     cursor.close()
     conn.close()
@@ -438,7 +444,7 @@ def insert_row(window, entries, columns, table, main_combo, resWindow, foreign_v
     is_valid = isValid(values, val_types)
 
     if not is_valid:
-        showerror(title="Ошибка!", message="Данные введены некорректно")
+        showerror(title="Ошибка", message="Данные введены некорректно!")
 
     else:
         result, columns = get_from_table(table)
@@ -485,15 +491,16 @@ def insert_row(window, entries, columns, table, main_combo, resWindow, foreign_v
                 cursor.execute(query, query_tuple)
                 conn.commit()
             except:
-                sqlite3.IntegrityError
+                messagebox.showerror('Ошибка', 'Данные введены некорректно!')
             cursor.close()
             conn.close()
-
             window.destroy()
-
             resWindow.destroy()
-
+            main_combo.set(table.upper())
             choose_dict(main_combo)
+
+
+
 
 
 def isValid(values, val_types):
@@ -507,25 +514,6 @@ def isValid(values, val_types):
         elif val_types[i] == 'decimal' and (values[i] <= 0 or values[i] >= 250000):
             return False
     return True
-
-
-def create_dict():
-    newWindow = Tk()
-    newWindow.title('Создать новый справочник')
-    newWindow.geometry('500x500')
-    name_lbl = Label(newWindow, width=40, text='Выберите справочник:')
-
-    dict_name = Entry(newWindow, width=35, takefocus=True)
-    dict_name.grid(column=0, row=0)
-    col_count = Label(newWindow, width=40, text='Выберите количество столбцов в справочнике:')
-    col_count.grid(column=0, row=5)
-    combo = Combobox(newWindow, width=1)
-    combo['values'] = [2, 3, 4, 5, 6, 7]
-    combo.grid(column=5, row=5)
-    submit_dict = Button(newWindow, text='Подтвердить')
-    submit_dict.grid(column=0, row=10)
-    newWindow.mainloop()
-    return 0
 
 
 def interface():
@@ -543,15 +531,13 @@ def interface():
     combo.grid(column=0, row=2)
     btn = Button(window, text='Выбор', command=partial(choose_dict, combo))
     btn.grid(column=0, row=3)
-
-    # create_btn = Button(window, text='Добавить новый справочник', command=create_dict, width=25)
-    # create_btn.grid(column=0, row=3)
     window.mainloop()
 
 
 def sorting(col_name, sort_type, table, combo, window):
     sorted_res, columns = get_from_table(table, col_name, sort_type)
     window.destroy()
+    combo.set(table.upper())
     choose_dict(combo, sorted_res, columns)
 
 
