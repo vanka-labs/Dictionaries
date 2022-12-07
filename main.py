@@ -112,7 +112,6 @@ def choose_dict(combo, sorted_res=0, columns=0):
         res = sorted_res
     else:
         res, columns = get_from_table(chosen_dict)
-
     tables_info, table_names = get_tables()
     table_info = tables_info[table_names.index(chosen_dict)]
     unchangeable_col = get_foreign_keys(chosen_dict)
@@ -128,13 +127,19 @@ def choose_dict(combo, sorted_res=0, columns=0):
         index_unchangeable_col1 = columns.index(unchangeable_col1)
         if unchangeable_col2 is not None:
             index_unchangeable_col2 = columns.index(unchangeable_col2)
+            additional_info = True
         else:
             index_unchangeable_col2 = - 1
+            additional_info = False
+        foreign_values = get_foreign_values(unchangeable_col[0], additional_info)
+
     else:
         index_unchangeable_col1, index_unchangeable_col2 = -1, -1
     if res:
+
         for i in range(len(res) + 1):
             entries = []
+            curr_foreign_id = 0
             for j in range(len(res[0])):
                 if not i:
                     col_name = columns[j].replace('_', ' ').upper()
@@ -159,15 +164,29 @@ def choose_dict(combo, sorted_res=0, columns=0):
                                 decimal_col.split(', ')[1][0:-1])
                             getcontext().prec = float_len + int_len
                             decimal_res = Decimal(str(res[i - 1][j])) + Decimal('0.0')
-                            e.insert(END, decimal_res.normalize())
+                            e.insert(END, str(decimal_res.normalize()))
                             entries.append(e)
                             getcontext().prec = 27
                         else:
                             e.insert(END, res[i - 1][j])
                             entries.append(e)
                     if j == index_unchangeable_col1 or j == index_unchangeable_col2:
+
                         for_result = Label(resWindow2, text=res[i - 1][j], width=30, anchor="w", relief=GROOVE)
                         for_result.grid(column=j, row=i)
+                        if index_unchangeable_col2 is None:
+                            id_tuple = (res[i - 1][j],)
+                            for for_value in foreign_values:
+                                if id_tuple[0] == for_value[0]:
+                                    curr_foreign_id = for_value[2]
+                                    break
+
+                        else:
+                            id_tuple = (res[i - 1][index_unchangeable_col1], res[i - 1][index_unchangeable_col2])
+                            for for_value in foreign_values:
+                                if id_tuple[0] == for_value[0] and id_tuple[1] == for_value[1]:
+                                    curr_foreign_id = for_value[2]
+
                     if j == date_index:
                         data = res[i - 1][j]
                         if '-' in data:
@@ -179,8 +198,8 @@ def choose_dict(combo, sorted_res=0, columns=0):
                         elif '.' in data:
                             data = data.split('.')
                             year, month, day = int(data[2]), int(data[1]), int(data[0])
-
                         data = date(year, month, day)
+
                         calendar = DateEntry(resWindow2, width=20, background='darkblue',
                                              foreground='white', borderwidth=2, year=2022, locale='ru_RU',
                                              font="Arial 12")
@@ -189,9 +208,10 @@ def choose_dict(combo, sorted_res=0, columns=0):
                         calendar.grid(column=j, row=i)
                         entries.append(calendar)
                     if j == len(res[0]) - 1:
-                        edit_btn = Button(resWindow2, text='изменить', command=partial(edit, res[i - 1], entries,
+                        edit_btn = Button(resWindow2, text='изменить', command=partial(new_update, res[i - 1],
                                                                                        columns, chosen_dict, resWindow2,
-                                                                                       combo, table_info))
+                                                                                       combo, table_info,
+                                                                                       curr_foreign_id))
                         edit_btn.grid(column=j + 1, row=i)
                         delete_btn = Button(resWindow2, text='удалить', command=partial(delete, res[i - 1], columns,
                                                                                         chosen_dict, resWindow2, combo))
@@ -312,6 +332,131 @@ def edit(row, entries, columns, table, window, combo, table_info):
     choose_dict(combo)
 
 
+def new_update(curr_row, columns, table, window, main_combo, table_info, foreign_id=0):
+    entries = []
+    date_flag, date_index, temp_index = False, -1, -1
+    for i in range(1, len(table_info)):
+        if i % 2 and table_info[i] in columns:
+            entries.append((table_info[i], table_info[i + 1]))
+            temp_index += 1
+            if table_info[i + 1] == 'date':
+                date_flag, date_index = True, temp_index
+    foreign_col = get_foreign_keys(table)
+    updateWindow = Tk()
+    new_row = []
+    updateWindow.title('Изменение записи')
+    for i in range(len(entries)):
+        lbl = Label(updateWindow, text=entries[i][0].replace('_', ' ').upper() + ':', relief=GROOVE, width=30)
+        lbl.grid(column=0, row=i)
+        if i == date_index:
+            data = curr_row[i]
+            if '-' in data:
+                data = data.split('-')
+                year, month, day = int(data[0]), int(data[1]), int(data[2])
+
+                data = date(year, month, day)
+
+            entry = DateEntry(updateWindow, width=18, background='darkblue',
+                              foreground='white', borderwidth=2, year=2022, locale='ru_RU', font="Arial 12")
+            entry.set_date(data)
+        else:
+            entry = Entry(updateWindow, takefocus=True, width=30)
+            entry.insert(END, curr_row[i])
+        entry.grid(column=1, row=i)
+        new_row.append(entry)
+    submit = Button(updateWindow, text='Подтвердить', command=partial(edit_row, new_row, updateWindow, curr_row,
+                                                                      columns, table, date_index, main_combo, window))
+
+    if foreign_col:
+        additional_info_flag = False
+        foreign_id_name = foreign_col[0][1]
+        if foreign_col[0][3] is not None:
+            additional_info_flag = True
+        foreign_values = get_foreign_values(foreign_col[0], additional_info_flag)
+
+        foreign_values_arr = []
+        for j in range(len(foreign_values)):
+            if additional_info_flag:
+                foreign_values_arr.append(foreign_values[j][0] + ', ' + foreign_values[j][1])
+            else:
+                foreign_values_arr.append(foreign_values[j][0])
+        lbl = Label(updateWindow, text=foreign_col[0][2].replace('_', ' ').upper() + ':', relief=GROOVE, width=30)
+        lbl.grid(column=0, row=i + 1)
+        combo = Combobox(updateWindow, width=27)
+        combo['values'] = foreign_values_arr
+        combo.grid(column=1, row=i + 1)
+        combo.set(foreign_values_arr[foreign_id - 1])
+        new_row.append(combo)
+        submit = Button(updateWindow, text='Подтвердить', command=partial(edit_row, new_row, updateWindow, curr_row,
+                                                                          columns, table, date_index, main_combo,
+                                                                          window,
+                                                                          foreign_values=foreign_values, combo=combo,
+                                                                          flag=additional_info_flag,
+                                                                          foreign_id_name=foreign_id_name,
+                                                                          curr_foreign_id=foreign_id))
+
+    submit.grid(column=0, row=i + 2)
+
+
+def edit_row(new_row, updateWindow, curr_row, columns, table, date_index, main_combo, window, foreign_values=0, combo=0,
+             flag=0, foreign_id_name=0, curr_foreign_id=0):
+    id = get_row_id(curr_row, columns, table)
+    changed = []
+    if combo:
+        for i in range(len(new_row) - 1):
+            if i == date_index:
+                new_date = new_row[i].get().split('.')
+                year, month, day = new_date[2], new_date[1], new_date[0]
+                new_date = year + '-' + month + '-' + day
+
+                if new_date != curr_row[i]:
+                    try:
+                        new_date = date(int(year), int(month), int(day))
+                    except:
+                        new_date = None
+                    changed.append((columns[i], new_date))
+            elif new_row[i].get() != str(curr_row[i]):
+                changed.append((columns[i], new_row[i].get()))
+        foreign_row = new_row[-1].get()
+        foreign_row = set(foreign_row.split(', ')) if flag else {foreign_row}
+        is_foreign = False
+        for foreign_val in foreign_values:
+            if foreign_row.issubset(foreign_val):
+                is_foreign = True
+                break
+        foreign_id = foreign_val[-1] if is_foreign else -1
+        if foreign_id != curr_foreign_id and foreign_id > 0:
+            changed.append((foreign_id_name, foreign_id))
+    else:
+        for i in range(len(new_row)):
+            if i == date_index:
+                new_date = new_row[i].get().split('.')
+                year, month, day = new_date[2], new_date[1], new_date[0]
+                new_date = year + '-' + month + '-' + day
+                if new_date != curr_row[i]:
+                    changed.append((columns[i], new_date))
+            elif new_row[i].get() != str(curr_row[i]):
+                changed.append((columns[i], new_row[i].get()))
+    if changed:
+        conn = sqlite3.connect('dictionary.db')
+        cursor = conn.cursor()
+
+        for e in changed:
+            try:
+                query = "update " + table + " set "
+                query += e[0] + "=? where id=?;"
+                cursor.execute(query, (e[1], id))
+                conn.commit()
+            except:
+                messagebox.showerror('Ошибка', 'Данные введены некорректно!')
+        cursor.close()
+        conn.close()
+    window.destroy()
+    updateWindow.destroy()
+    main_combo.set(table.upper())
+    choose_dict(main_combo)
+
+
 def delete(row, columns, table, window, combo):
     id = get_row_id(row, columns, table)
     conn = sqlite3.connect('dictionary.db')
@@ -351,7 +496,6 @@ def insert(table, columns, main_combo, resWindow, table_info):
             temp_index += 1
             if table_info[i + 1] == 'date':
                 date_flag, date_index = True, temp_index
-
     foreign_col = get_foreign_keys(table)
     insertWindow = Tk()
     insertWindow.title('Добавление записи')
@@ -359,10 +503,10 @@ def insert(table, columns, main_combo, resWindow, table_info):
         lbl = Label(insertWindow, text=entries[i][0].replace('_', ' ').upper() + ':', relief=GROOVE, width=30)
         lbl.grid(column=0, row=i)
         if i == date_index:
-            entry = DateEntry(insertWindow, width=12, background='darkblue',
+            entry = DateEntry(insertWindow, width=18, background='darkblue',
                               foreground='white', borderwidth=2, year=2022, locale='ru_RU', font="Arial 12")
         else:
-            entry = Entry(insertWindow, takefocus=True, width=20)
+            entry = Entry(insertWindow, takefocus=True, width=30)
         entry.grid(column=1, row=i)
         row.append(entry)
     submit = Button(insertWindow, text='Подтвердить', command=partial(insert_row, insertWindow, row, columns, table,
@@ -381,7 +525,7 @@ def insert(table, columns, main_combo, resWindow, table_info):
                 foreign_values_arr.append(foreign_values[j][0])
         lbl = Label(insertWindow, text=foreign_col[0][2].replace('_', ' ').upper() + ':', relief=GROOVE, width=30)
         lbl.grid(column=0, row=i + 1)
-        combo = Combobox(insertWindow, width=20)
+        combo = Combobox(insertWindow, width=27)
         combo['values'] = foreign_values_arr
         combo.grid(column=1, row=i + 1)
         submit = Button(insertWindow, text='Подтвердить', command=partial(insert_row, insertWindow, row, columns, table,
@@ -498,9 +642,6 @@ def insert_row(window, entries, columns, table, main_combo, resWindow, foreign_v
             resWindow.destroy()
             main_combo.set(table.upper())
             choose_dict(main_combo)
-
-
-
 
 
 def isValid(values, val_types):
